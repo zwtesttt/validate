@@ -45,7 +45,7 @@ func (v *Validate) ValidateStruct(stc interface{}) *ValidationErrors {
 				ruleParts := strings.Split(rule, "=")
 				validatorName := ruleParts[0]
 				validatorArgs := ruleParts[1:]
-				v.CustomErrorMessage(field.Name, rule)
+				v.customErrorMessage(field.Name, rule)
 				if err := v.validateField(field.Name, validatorName, fieldValue, validatorArgs); err != nil {
 					validationErrors.Message = err.Error()
 					return &validationErrors
@@ -56,7 +56,7 @@ func (v *Validate) ValidateStruct(stc interface{}) *ValidationErrors {
 	return nil
 }
 
-func (v *Validate) CustomErrorMessage(field, option string) {
+func (v *Validate) customErrorMessage(field, option string) {
 	ops := strings.Split(option, v.MessageSep)
 	if len(ops) < 2 {
 		return // 无效的选项格式
