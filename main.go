@@ -12,7 +12,7 @@ type User struct {
 }
 
 type Address struct {
-	Street  string `validate:"required"`
+	Street  string `validate:"required,88888"`
 	City    string `validate:"required"`
 	Country string `validate:"required~不能为空"`
 }
@@ -21,11 +21,10 @@ func main() {
 	address := Address{
 		Street:  "ff",
 		City:    "6666",
-		Country: "",
+		Country: "ssssss",
 	}
 	user := User{Name: "ssss", Age: 18, Address: address}
 	validate := validator.New()
-	validate.MessageSep = "~"
 
 	if err := validate.ValidateStruct(user); err != nil {
 		fmt.Println("Validation failed:", err.Message)

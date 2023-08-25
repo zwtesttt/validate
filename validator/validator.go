@@ -2,6 +2,7 @@ package validator
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -23,7 +24,7 @@ type ValidationErrors struct {
 func New() *Validate {
 	return &Validate{
 		Lang:          "default",
-		MessageSep:    "->",
+		MessageSep:    "~",
 		isRequiredAll: false,
 		ErrMap:        make(map[string]map[string]string),
 	}
@@ -44,7 +45,6 @@ func (v *Validate) ValidateStruct(stc interface{}) *ValidationErrors {
 				ruleParts := strings.Split(rule, "=")
 				validatorName := ruleParts[0]
 				validatorArgs := ruleParts[1:]
-
 				v.CustomErrorMessage(field.Name, rule)
 				if err := v.validateField(field.Name, validatorName, fieldValue, validatorArgs); err != nil {
 					validationErrors.Message = err.Error()
@@ -70,14 +70,16 @@ func (v *Validate) CustomErrorMessage(field, option string) {
 }
 
 func (v *Validate) validateField(fieldName, validatorName string, value interface{}, args []string) error {
-	str := strings.Split(validatorName, v.MessageSep)
+
 	cs := ValidationStruct{
-		v.MessageSep, fieldName, str[0], value, args, v.ErrMap,
+		v.MessageSep, fieldName, validatorName, value, args, v.ErrMap,
 	}
-	if validationFunc, ok := validationFunctions[str[0]]; ok {
+	if validationFunc, ok := validationFunctions[validatorName]; ok {
 		if err := validationFunc(cs); err != nil {
 			return err
 		}
+	} else {
+		return fmt.Errorf("No such rule:%s", validatorName)
 	}
 
 	field := reflect.ValueOf(value)
