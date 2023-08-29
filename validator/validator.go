@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+const (
+	VARKEY = "one"
+)
+
 type Validate struct {
 	Lang          string
 	MessageSep    string
@@ -15,7 +19,7 @@ type Validate struct {
 }
 
 type ValidationErrors struct {
-	StructField string
+	StructField reflect.StructField
 	Field       string
 	Value       interface{}
 	Message     string
@@ -23,15 +27,14 @@ type ValidationErrors struct {
 
 func New() *Validate {
 	return &Validate{
-		Lang:          "default",
+		Lang:          "en",
 		MessageSep:    "~",
 		isRequiredAll: false,
 		ErrMap:        make(map[string]map[string]string),
 	}
 }
 
-func (v *Validate) ValidateStruct(stc interface{}) *ValidationErrors {
-	validationErrors := ValidationErrors{}
+func (v *Validate) ValidateStruct(stc interface{}) error {
 	val := reflect.ValueOf(stc)
 	//遍历结构体所有参数
 	for i := 0; i < val.NumField(); i++ {
@@ -43,12 +46,19 @@ func (v *Validate) ValidateStruct(stc interface{}) *ValidationErrors {
 			rules := strings.Split(tag, ",")
 			for _, rule := range rules {
 				ruleParts := strings.Split(rule, "=")
-				validatorName := ruleParts[0]
+				ops := ruleParts[0]
+				validatorName := strings.Split(ops, v.MessageSep)
 				validatorArgs := ruleParts[1:]
 				v.customErrorMessage(field.Name, rule)
-				if err := v.validateField(field.Name, validatorName, fieldValue, validatorArgs); err != nil {
-					validationErrors.Message = err.Error()
-					return &validationErrors
+
+				if err := v.validateField(field.Name, validatorName[0], fieldValue, validatorArgs); err != nil {
+					//封装错误信息
+					return &ValidationErrors{
+						Message:     err.Error(),
+						Value:       fieldValue,
+						Field:       field.Name,
+						StructField: field,
+					}
 				}
 			}
 		}
@@ -56,6 +66,9 @@ func (v *Validate) ValidateStruct(stc interface{}) *ValidationErrors {
 	return nil
 }
 
+func (ve *ValidationErrors) Error() string {
+	return ve.Message
+}
 func (v *Validate) customErrorMessage(field, option string) {
 	ops := strings.Split(option, v.MessageSep)
 	if len(ops) < 2 {
@@ -70,23 +83,59 @@ func (v *Validate) customErrorMessage(field, option string) {
 }
 
 func (v *Validate) validateField(fieldName, validatorName string, value interface{}, args []string) error {
-
 	cs := ValidationStruct{
-		v.MessageSep, fieldName, validatorName, value, args, v.ErrMap,
+		v.MessageSep, fieldName, validatorName, reflect.ValueOf(value), value, args, v.ErrMap,
 	}
 	if validationFunc, ok := validationFunctions[validatorName]; ok {
 		if err := validationFunc(cs); err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf("No such rule:%s", validatorName)
+		return fmt.Errorf("no such rule:%s", validatorName)
 	}
 
 	field := reflect.ValueOf(value)
 	if field.Kind() == reflect.Struct {
 		if err := v.ValidateStruct(value); err != nil {
-			return errors.New(err.Message)
+			return errors.New(err.Error())
 		}
+	}
+	return nil
+}
+
+// 添加自定义规则
+func (v *Validate) AddValidationRule(validationName string, vsf ValidationFunc) error {
+	if len(validationName) == 0 {
+		return fmt.Errorf("null rule")
+	}
+	if _, ok := validationFunctions[validationName]; !ok {
+		validationFunctions[validationName] = vsf
+		return nil
+	}
+
+	return fmt.Errorf("existing rule")
+}
+
+// 校验单个变量
+func (v *Validate) Var(arg interface{}, tag string) error {
+	if len(tag) == 0 {
+		return fmt.Errorf("null rule")
+	}
+	rules := strings.Split(tag, ",")
+	for _, rule := range rules {
+		ruleParts := strings.Split(rule, "=")
+		ops := ruleParts[0]
+		validatorName := strings.Split(ops, v.MessageSep)
+		validatorArgs := ruleParts[1:]
+		v.customErrorMessage(VARKEY, rule)
+		if err := v.validateField(VARKEY, validatorName[0], arg, validatorArgs); err != nil {
+			//封装错误信息
+			return &ValidationErrors{
+				Message: err.Error(),
+				Value:   arg,
+			}
+		}
+
 	}
 	return nil
 }

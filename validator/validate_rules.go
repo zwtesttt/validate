@@ -2,6 +2,7 @@ package validator
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -9,12 +10,13 @@ import (
 type ValidationFunc func(ValidationStruct) error
 
 type ValidationStruct struct {
-	MessageSep    string
-	fieldName     string
-	validatorName string
-	value         interface{}
-	args          []string
-	msgMap        map[string]map[string]string
+	messageSep    string
+	FieldName     string
+	ValidatorName string
+	Field         reflect.Value
+	Value         interface{}
+	Args          []string
+	MsgMap        map[string]map[string]string
 }
 
 var validationFunctions = map[string]ValidationFunc{
@@ -26,8 +28,8 @@ var validationFunctions = map[string]ValidationFunc{
 
 func validateRequired(vs ValidationStruct) error {
 	// 验证逻辑
-	if vs.value == "" {
-		errMsg := vs.msgMap[vs.fieldName][vs.validatorName]
+	if vs.Value == "" || vs.Value == 0 || vs.Value == nil {
+		errMsg := vs.MsgMap[vs.FieldName][vs.ValidatorName]
 		if errMsg == "" {
 			errMsg = "The value must"
 		}
@@ -37,23 +39,29 @@ func validateRequired(vs ValidationStruct) error {
 }
 
 func validateEmail(vs ValidationStruct) error {
-	// 验证逻辑
+	if !emailRegex.MatchString(fmt.Sprintf("%s", vs.Value)) {
+		errMsg := vs.MsgMap[vs.FieldName][vs.ValidatorName]
+		if errMsg == "" {
+			errMsg = "email format error"
+		}
+		return fmt.Errorf(errMsg)
+	}
 	return nil
 }
 
 func validateMin(vs ValidationStruct) error {
 	// 验证逻辑
-	if len(vs.args) == 0 {
+	if len(vs.Args) == 0 {
 		return fmt.Errorf("min validation requires an argument")
 	}
-	ops := strings.Split(vs.args[0], vs.MessageSep)
+	ops := strings.Split(vs.Args[0], vs.messageSep)
 	min, err := strconv.Atoi(ops[0])
 	if err != nil {
-		return fmt.Errorf("%s Parameter error", vs.validatorName)
+		return fmt.Errorf("%s Parameter error", vs.ValidatorName)
 	}
-	if intValue, ok := vs.value.(int); ok {
+	if intValue, ok := vs.Value.(int); ok {
 		if intValue < min {
-			errMsg := vs.msgMap[vs.fieldName][vs.validatorName]
+			errMsg := vs.MsgMap[vs.FieldName][vs.ValidatorName]
 			if !strings.Contains(errMsg, "%d") {
 				return fmt.Errorf(errMsg)
 			}
